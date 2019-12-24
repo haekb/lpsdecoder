@@ -1,0 +1,56 @@
+//------------------------------------------------
+//--- 010 Editor v10.0 Binary Template
+//
+//      File: 
+//   Authors: 
+//   Version: 
+//   Purpose: 
+//  Category: 
+// File Mask: 
+//  ID Bytes: 
+//   History: 
+//------------------------------------------------
+
+struct Header {
+//LithTech PSX Sound Data 1.20
+    char id[28];
+    uint dummy[2];
+    uint folders;
+    uint files;
+    uint dummy2[2];
+};
+
+struct File {
+    char filename[0x20];
+    uint zero;
+    uint offset;
+    uint size;
+    uint frequency;
+    uint zero2;
+    uint size2;
+    uint dummy[4];
+};
+
+struct Folder {
+    char foldername[32];
+    uint folders;   // Number of folders in this folder
+    uint files;     // Number of files in this folder (Note: Add this onto fileStartIndex to get the range of files.)
+    uint priority;
+    uint fileStartIndex;
+};
+
+Header hdr;
+
+local int base_pos = FTell();
+// 0x48 = 72
+// 0x30 = 48
+//    xmath BASE_OFF "TMP + (FILES * 0x48) + (FOLDERS * 0x30)"
+local int base_offset = base_pos + (hdr.files * 0x48) + (hdr.folders * 0x30);
+
+File files[hdr.files];
+Folder folders[hdr.folders];
+
+
+local int dooroffset = 715120 + base_offset;
+FSeek(dooroffset);
+local int hi = 1;
