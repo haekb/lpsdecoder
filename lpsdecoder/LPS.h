@@ -45,25 +45,6 @@ struct BuiltFolder {
 struct BuiltSound {
     File* file;
     BuiltFolder* folder;
-    //Folder* folder;
-};
-
-struct by_startIndex {
-    bool operator()(Folder const& a, Folder const& b) const {
-        return a.fileStartIndex < b.fileStartIndex;
-    }
-};
-
-struct by_folder {
-    bool operator()(Folder const& a, Folder const& b) const {
-        return a.folders > b.folders;
-    }
-};
-
-struct by_priority {
-    bool operator()(Folder const& a, Folder const& b) const {
-        return a.priority > b.priority;
-    }
 };
 
 struct by_priority_then_folder_then_startIndex {
@@ -89,8 +70,7 @@ public:
 	void Extract();
 protected:
 
-    uint FolderNightmare(int index, BuiltFolder* builtFolder);
-    std::string CalculatePath(uint fileIndex, File file);
+    uint TraverseFolder(int index, BuiltFolder* builtFolder);
 
     Header m_Header;
     std::vector<File> m_Files;
@@ -101,5 +81,8 @@ protected:
     std::vector<BuiltFolder> m_BuiltFolders;
 
     std::ifstream m_Stream;
+
+    int m_SkipIndex;
+    bool m_Closed;
 };
 
