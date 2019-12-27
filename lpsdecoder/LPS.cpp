@@ -1,11 +1,15 @@
 #include "LPS.h"
 #include <iostream>
+#include <Windows.h>
 
+bool DirExist(char* strPath);
+bool CreateDir(char* strPath);
 
 LPS::LPS()
 {
 	m_Closed = false;
 	m_SkipIndex = 0;
+	m_BaseOffset = 0;
 	m_Header = {};
 }
 
@@ -24,6 +28,13 @@ bool LPS::Open(std::string filename)
 
 	// Read in the data
 	m_Stream.read((char*)&m_Header, sizeof(m_Header));
+
+	/*
+	    savepos TMP
+    xmath BASE_OFF "TMP + (FILES * 0x48) + (FOLDERS * 0x30)"
+	*/
+	uint currentPos = m_Stream.tellg();
+	m_BaseOffset = currentPos + (m_Header.files * 0x48) + (m_Header.folders * 0x30);
 
 	for (uint i = 0; i < m_Header.files; i++)
 	{
@@ -173,6 +184,154 @@ void LPS::Extract()
 	// Cool, we can extract now!
 	for (auto sound : builtSounds)
 	{
-		std::cout << sound.folder->path << "/" << sound.file->filename << "\n";
+		// Build the extraction path
+		std::string outputFilename = "out/";
+		std::string extension = ".ss2";
+		outputFilename += sound.folder->path + "/";// +sound.file->filename;
+
+		// Create the directory if needed
+		auto result = CreateDir((char*)outputFilename.c_str());
+
+
+		outputFilename += sound.file->filename;
+
+		// Replace extension
+		outputFilename.replace(outputFilename.end() - 4, outputFilename.end(), extension);
+
+		std::ofstream fileOut((char*)outputFilename.c_str(), std::ios_base::binary);
+
+
+		uint currentPos = 0;
+		uint togo = sound.file->size;
+		uint inc = 2048;
+		auto seek = sound.file->offset + m_BaseOffset;
+
+
+		if (!fileOut.is_open()) {
+			continue;
+		}
+
+		m_Stream.seekg(seek);
+
+		/* SS2 header via the BMS script
+		put 0x64685353 long MEMORY_FILE
+		put 0x18 long MEMORY_FILE
+		put 0x10 long MEMORY_FILE
+		put FREQUENCY long MEMORY_FILE
+		put CHANNELS long MEMORY_FILE
+		put INTERLEAVE long MEMORY_FILE
+		put 0 long MEMORY_FILE
+		put 0xffffffff long MEMORY_FILE
+		put 0x64625353 long MEMORY_FILE
+		put SIZE long MEMORY_FILE
+		*/
+		SS2Header header = {
+			0x64685353,
+			0x18,
+			0x10,
+			sound.file->frequency,
+			1, // Mono!
+			0, // No interleave?
+			0,
+			0xffffffff,
+			0x64625353,
+			sound.file->size
+		};
+
+		// Write out the header
+		// There's probably a better way to do this.
+		fileOut.write(reinterpret_cast<const char*>(&header.type), sizeof(header.type));
+		fileOut.write(reinterpret_cast<const char*>(&header.one), sizeof(header.one));
+		fileOut.write(reinterpret_cast<const char*>(&header.two), sizeof(header.two));
+		fileOut.write(reinterpret_cast<const char*>(&header.frequency), sizeof(header.frequency));
+		fileOut.write(reinterpret_cast<const char*>(&header.channels), sizeof(header.channels));
+		fileOut.write(reinterpret_cast<const char*>(&header.interleave), sizeof(header.interleave));
+		fileOut.write(reinterpret_cast<const char*>(&header.zero), sizeof(header.zero));
+		fileOut.write(reinterpret_cast<const char*>(&header.max), sizeof(header.max));
+		fileOut.write(reinterpret_cast<const char*>(&header.three), sizeof(header.three));
+		fileOut.write(reinterpret_cast<const char*>(&header.size), sizeof(header.size));
+
+#if 0
+		char* buffer = new char[togo];
+		m_Stream.read(buffer, togo);
+		fileOut.write(buffer, togo);
+#else
+		// Extract 2048 by 2048
+		while (togo > 0) {
+			if (togo < inc) {
+				inc = togo;
+			}
+
+			char* buffer = new char[inc];
+
+			m_Stream.read(buffer, inc);
+			currentPos += m_Stream.gcount();
+
+			fileOut.write(buffer, inc);
+
+
+			togo -= inc;
+		}
+#endif
+
+		std::cout << "Extracted " << outputFilename << "\n";//sound.folder->path << "/" << sound.file->filename << "\n";
 	}
+}
+
+
+
+//
+// From WinUtil of NOLF SDK
+// 
+bool DirExist(char* strPath)
+{
+	if (!strPath || !*strPath) return false;
+
+	bool bDirExists = false;
+
+	bool bRemovedBackSlash = false;
+	if (strPath[strlen(strPath) - 1] == '/')
+	{
+		strPath[strlen(strPath) - 1] = '\0';
+		bRemovedBackSlash = true;
+	}
+
+	UINT oldErrorMode = SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOOPENFILEERRORBOX);
+	struct stat statbuf;
+	int error = stat(strPath, &statbuf);
+	SetErrorMode(oldErrorMode);
+	if (error != -1) bDirExists = true;
+
+	if (bRemovedBackSlash)
+	{
+		strPath[strlen(strPath)] = '/';
+	}
+
+	return bDirExists;
+}
+
+//
+// From WinUtil of NOLF SDK
+// 
+bool CreateDir(char* strPath)
+{
+	if (DirExist(strPath)) return true;
+	if (strPath[strlen(strPath) - 1] == ':') return false;		// special case
+
+	char strPartialPath[MAX_PATH];
+	strPartialPath[0] = '\0';
+
+	char* token = strtok(strPath, "/");
+	while (token)
+	{
+		strcat(strPartialPath, token);
+		if (!DirExist(strPartialPath) && strPartialPath[strlen(strPartialPath) - 1] != ':')
+		{
+			if (!CreateDirectoryA(strPartialPath, NULL)) return false;
+		}
+		strcat(strPartialPath, "/");
+		token = strtok(NULL, "/");
+	}
+
+	return true;
 }

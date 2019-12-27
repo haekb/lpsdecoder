@@ -47,6 +47,38 @@ struct BuiltSound {
     BuiltFolder* folder;
 };
 
+/*
+struct WaveHeader {
+    char riff[4];
+    int fileSize;
+    char type[4]; 
+    char chunkMarker[4];
+    int chunkSize;
+    short formatTag;
+    unsigned short Channels;
+    unsigned int SamplePerSeconds;
+    unsigned int AverageBytesPerSeconds;
+    unsigned short BlockAlign;
+    unsigned short BitsPerSample;
+    unsigned char unknown[2];
+    char dataChunk[4];
+    int chunkSize;
+    // Then samples!
+};
+*/
+struct SS2Header {
+    uint type;
+    uint one;
+    uint two;
+    uint frequency;
+    uint channels;
+    uint interleave;
+    uint zero;
+    uint max;
+    uint three;
+    uint size;
+};
+
 struct by_priority_then_folder_then_startIndex {
     bool operator()(Folder const& a, Folder const& b) const {
 
@@ -84,5 +116,6 @@ protected:
 
     int m_SkipIndex;
     bool m_Closed;
+    uint m_BaseOffset;
 };
 
