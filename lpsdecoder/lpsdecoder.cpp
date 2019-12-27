@@ -30,9 +30,9 @@ int main(int argc, char* argv[], char* envp[])
     options.add_options()
         ("h,help", "Help", cxxopts::value(showHelp))
         ("f,file", "LPS Filename", cxxopts::value(filename))
-        ("e,extract-only", "Extract Only (Don't convert to wav)", cxxopts::value(extractOnly))
+        ("e,extract-only", "Extract Only (Don't convert to wav)", cxxopts::value(extractOnly)->default_value("false"))
         ("c,clean-up-ss2", "Clean up SS2 files after converting to wav", cxxopts::value<bool>(cleanUpSS2)->default_value("true"))
-        ("v,path-to-vgm-stream", "Path to VGMStream", cxxopts::value(pathToVGMStream))
+        ("v,path-to-vgm-stream", "Path to VGMStream", cxxopts::value(pathToVGMStream)->default_value(pathToVGMStream))
         ;
 
     auto result = options.parse(argc, argv);
