@@ -14,7 +14,7 @@ int main(int argc, char* argv[], char* envp[])
     bool showHelp = false;
     bool extractOnly = false;
     bool cleanUpSS2 = true;
-    std::string filename = "menumusic.lps";
+    std::string filename = "";
 
     char buffer[MAX_PATH];
     GetCurrentDirectory(MAX_PATH, buffer);

@@ -186,6 +186,7 @@ void LPS::Extract(std::string pathToVGMStream, bool extractOnly, bool cleanUp)
 	// Cool, we can extract now!
 	for (auto sound : builtSounds)
 	{
+		std::cout << "-----------------------\n";
 		// Build the extraction path
 		std::string outputFilename = "out\\";
 		std::string extension = ".ss2";
@@ -204,15 +205,15 @@ void LPS::Extract(std::string pathToVGMStream, bool extractOnly, bool cleanUp)
 		// Replace extension
 		outputFilename.replace(outputFilename.end() - 4, outputFilename.end(), extension);
 
-		std::ofstream fileOut((char*)outputFilename.c_str(), std::ios_base::binary);
+		std::ofstream fileOut((char*)outputFilename.c_str(), std::ios_base::binary | std::ios_base::trunc);
 
 		uint currentPos = 0;
 		uint togo = sound.file->size;
 		uint inc = 2048;
 		auto seek = sound.file->offset + m_BaseOffset;
 
-
 		if (!fileOut.is_open()) {
+			std::cout << "ERROR: Failed to create file " << outputFilename << "\n";
 			continue;
 		}
 
@@ -284,7 +285,7 @@ void LPS::Extract(std::string pathToVGMStream, bool extractOnly, bool cleanUp)
 		fileOut.close();
 
 		// Sleep, otherwise Windows will choke on CreateProcess
-		Sleep(100);
+		Sleep(250);
 
 		// Only extracting, let's skip the conversion.
 		if (extractOnly) {
@@ -328,9 +329,8 @@ void LPS::Extract(std::string pathToVGMStream, bool extractOnly, bool cleanUp)
 			&pi             // Pointer to PROCESS_INFORMATION structure (removed extra parentheses)
 		);
 
-		if (result) {
-			//std::cout << "Converted " << outputFilename << " to wav\n";
-		}
+		// Wait for the process to finish. 
+		WaitForSingleObject(pi.hProcess, INFINITE);
 
 		// Close process and thread handles. 
 		CloseHandle(pi.hProcess);
