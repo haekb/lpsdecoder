@@ -99,7 +99,7 @@ public:
 	bool Open(std::string filename);
 	bool Close();
 
-	void Extract();
+	void Extract(std::string pathToVGMStream, bool extractOnly, bool cleanUp);
 protected:
 
     uint TraverseFolder(int index, BuiltFolder* builtFolder);

@@ -111,10 +111,12 @@ uint LPS::TraverseFolder(int index, BuiltFolder* builtFolder)
 
 		// Bolt on the path
 		std::string oldPath = folderInner.path;
-		folderInner.path = builtFolder->path;
-		folderInner.path += "/";
-		folderInner.path += oldPath;
-
+		// Ignore root, as it doesn't actually contain a path...
+		if (!builtFolder->path.empty()) {
+			folderInner.path = builtFolder->path;
+			folderInner.path += "\\";
+			folderInner.path += oldPath;
+		}
 		// Oh hey we have a folder!
 		if (folderInner.folder->folders > 0) {
 			// Recursively unwrap this folder
@@ -134,7 +136,7 @@ uint LPS::TraverseFolder(int index, BuiltFolder* builtFolder)
 }
 
 
-void LPS::Extract()
+void LPS::Extract(std::string pathToVGMStream, bool extractOnly, bool cleanUp)
 {
 	int index = 0;
 	std::vector<BuiltSound> builtSounds;
@@ -185,21 +187,24 @@ void LPS::Extract()
 	for (auto sound : builtSounds)
 	{
 		// Build the extraction path
-		std::string outputFilename = "out/";
+		std::string outputFilename = "out\\";
 		std::string extension = ".ss2";
-		outputFilename += sound.folder->path + "/";// +sound.file->filename;
+		std::string originalOutputFilename = "";
+
+		outputFilename += sound.folder->path + "\\";
 
 		// Create the directory if needed
 		auto result = CreateDir((char*)outputFilename.c_str());
 
-
 		outputFilename += sound.file->filename;
+
+		// Save the original output
+		originalOutputFilename = outputFilename.c_str();
 
 		// Replace extension
 		outputFilename.replace(outputFilename.end() - 4, outputFilename.end(), extension);
 
 		std::ofstream fileOut((char*)outputFilename.c_str(), std::ios_base::binary);
-
 
 		uint currentPos = 0;
 		uint togo = sound.file->size;
@@ -274,7 +279,73 @@ void LPS::Extract()
 		}
 #endif
 
-		std::cout << "Extracted " << outputFilename << "\n";//sound.folder->path << "/" << sound.file->filename << "\n";
+		std::cout << "Extracted " << outputFilename << "\n";
+
+		fileOut.close();
+
+		// Sleep, otherwise Windows will choke on CreateProcess
+		Sleep(100);
+
+		// Only extracting, let's skip the conversion.
+		if (extractOnly) {
+			continue;
+		}
+
+		// Conversion variables - Big ol' Windows mess
+		char buffer[MAX_PATH];
+		GetCurrentDirectory(MAX_PATH, buffer);
+		std::string path = buffer;
+		path += "\\";
+
+		// Loop once, no fade out!
+		std::string commandArgs = " -o \"" + path + originalOutputFilename + "\" -l 1.0 -f 0.0 \"" + path + outputFilename + "\"";
+		size_t exePosition = pathToVGMStream.find_last_of("\\");
+
+		// Trim off the starting slashes, and grab the exe name!
+		std::string exe = pathToVGMStream.substr(exePosition+1, pathToVGMStream.length());
+		commandArgs = exe + commandArgs;
+
+		STARTUPINFO si;
+		PROCESS_INFORMATION pi;
+		char* lpApplicationName = (char*)pathToVGMStream.c_str();
+		char* lpCommandArgs = (char*)commandArgs.c_str();
+
+		// set the size of the structures
+		ZeroMemory(&si, sizeof(si));
+		si.cb = sizeof(si);
+		ZeroMemory(&pi, sizeof(pi));
+
+		// start the program up
+		auto appResult = CreateProcess(lpApplicationName,   // the path
+			lpCommandArgs,        // Command line
+			NULL,           // Process handle not inheritable
+			NULL,           // Thread handle not inheritable
+			FALSE,          // Set handle inheritance to FALSE
+			0,              // No creation flags
+			NULL,           // Use parent's environment block
+			NULL,           // Use parent's starting directory 
+			&si,            // Pointer to STARTUPINFO structure
+			&pi             // Pointer to PROCESS_INFORMATION structure (removed extra parentheses)
+		);
+
+		if (result) {
+			//std::cout << "Converted " << outputFilename << " to wav\n";
+		}
+
+		// Close process and thread handles. 
+		CloseHandle(pi.hProcess);
+		CloseHandle(pi.hThread);
+
+		// Clean up if they requested it.
+		if (cleanUp) {
+			if (remove((char*)outputFilename.c_str()) != 0) {
+				std::cout << "Failed to clean up " << outputFilename << "\n";
+				continue;
+			}
+
+			std::cout << "Cleaned up " << outputFilename << "\n";
+		}
+		
 	}
 }
 
@@ -290,7 +361,7 @@ bool DirExist(char* strPath)
 	bool bDirExists = false;
 
 	bool bRemovedBackSlash = false;
-	if (strPath[strlen(strPath) - 1] == '/')
+	if (strPath[strlen(strPath) - 1] == '\\')
 	{
 		strPath[strlen(strPath) - 1] = '\0';
 		bRemovedBackSlash = true;
@@ -304,7 +375,7 @@ bool DirExist(char* strPath)
 
 	if (bRemovedBackSlash)
 	{
-		strPath[strlen(strPath)] = '/';
+		strPath[strlen(strPath)] = '\\';
 	}
 
 	return bDirExists;
@@ -321,7 +392,7 @@ bool CreateDir(char* strPath)
 	char strPartialPath[MAX_PATH];
 	strPartialPath[0] = '\0';
 
-	char* token = strtok(strPath, "/");
+	char* token = strtok(strPath, "\\");
 	while (token)
 	{
 		strcat(strPartialPath, token);
@@ -329,8 +400,8 @@ bool CreateDir(char* strPath)
 		{
 			if (!CreateDirectoryA(strPartialPath, NULL)) return false;
 		}
-		strcat(strPartialPath, "/");
-		token = strtok(NULL, "/");
+		strcat(strPartialPath, "\\");
+		token = strtok(NULL, "\\");
 	}
 
 	return true;
